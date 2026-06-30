@@ -92,9 +92,9 @@ def load_model_and_scaler():
         model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
         
         model = joblib.load(model_path)
-        with open(scaler_path, "rb") as f:
+        with open(base_dir,'scaler.pkl', "rb") as f:
             scaler = pickle.load(f)   # consistent naam
-        with open('fine tuned model\config.pkl', 'rb') as f:
+        with open(base_dir,'config.pkl', 'rb') as f:
             config = pickle.load(f)
         return model, scaler, config
     except Exception as e:
