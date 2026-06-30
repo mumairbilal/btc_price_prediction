@@ -86,17 +86,16 @@ st.markdown("""
 @st.cache_resource
 def load_model_and_scaler():
     try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "btc_prediction_model.pkl")
         
-        rf_model = joblib.load(r"btc_prediction_model.pkl")
-        #model = load_model(r'btc_prediction_model.h5')
-        with open('scaler.pkl', 'rb') as f:
-            scaler = pickle.load(f)
-        # with open('fine tuned model\config.pkl', 'rb') as f:
-        #     config = pickle.load(f)
+        model = joblib.load(model_path)
+        # baqi scaler/config loading bhi isi tarah base_dir use karke karein
+        
         return model, scaler
     except Exception as e:
-        st.error(f" Model files not found! Please run 'python train_model.py' first.\n\nError: {e}")
-        return None, None, None
+        st.error(f"Model files not found! Error: {e}")
+        return None, None
 
 # Get real-time price from Binance
 @st.cache_data(ttl=10)  # Update every 10 seconds
