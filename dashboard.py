@@ -150,16 +150,14 @@ def get_binance_price(): # for showing the currect live btc price metrics
         return None
 
 # Get historical hourly data from Binance
-@st.cache_data(ttl=60)  # Cache for 1 minute (more frequent updates)
-def get_binance_historical(hours=48): # getting full btc data from binance for chart
+@st.cache_data(ttl=60)
+def get_binance_historical(hours=48):
     try:
-        #url = "https://api.binance.com/api/v3/klines"
-        # https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT
         url = "https://data-api.binance.vision/api/v3/klines"
         params = {
             'symbol': 'BTCUSDT',
             'interval': '1h',
-            'limit': hours
+            'limit': hours + 1   # ek extra mangwayein
         }
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
@@ -174,7 +172,10 @@ def get_binance_historical(hours=48): # getting full btc data from binance for c
         for col in ['open', 'high', 'low', 'close', 'volume']:
             df[col] = pd.to_numeric(df[col])
         
-        return df
+        # 🎯 LAST candle abhi chal raha hai (incomplete) — usay hata dein
+        df = df.iloc[:-1].reset_index(drop=True)
+        
+        return df.tail(hours)
     except Exception as e:
         st.error(f"Error fetching historical data: {e}")
         return pd.DataFrame()
@@ -287,7 +288,9 @@ def predict_multiple_hours(model, scaler, last_24_hours, hours=12):
     except Exception as e:
         st.error(f"RF Multi-Hour Prediction Error: {e}")
         return []
-
+@st.cache_data(ttl=3600)  # 1 hour tak cache rahega
+def get_cached_prediction(_model, _scaler, _live_data, hours):
+    return predict_multiple_hours(_model, _scaler, _live_data, hours)
 # Predict next hour price (ONLY FOR LSTM)
 # def predict_next_hour(model, scaler, last_24_hours):
 #     try:
@@ -387,7 +390,7 @@ def main():
 )
         st.markdown("---")
         
-        auto_refresh = st.checkbox("🔄 Auto Refresh (10s)", value=True)
+        auto_refresh = st.checkbox("🔄 Auto Refresh (60s)", value=True)
         
         if st.button("🔃 Manual Refresh", use_container_width=True):
             st.cache_data.clear()
@@ -425,6 +428,7 @@ def main():
     with col2:
         next_hour_pred = predict_next_hour(model, scaler, live_last_24)
         if next_hour_pred:
+            #pred_change = ((next_hour_pred - price_data['price']) / price_data['price'] * 100)
             pred_change = ((next_hour_pred - price_data['price']) / price_data['price'] * 100)
             st.metric(
                 label="🔮 Next Hour Prediction",
@@ -447,8 +451,8 @@ def main():
         )
     with col5:
         # Get predictions for next 12 hours
-        future_predictions = predict_multiple_hours(model, scaler, live_last_24, hours=12)
-        
+        #future_predictions = predict_multiple_hours(model, scaler, live_last_24, hours=12)
+        future_predictions = get_cached_prediction(model, scaler, live_last_24, hours=12)
         if future_predictions:
             # Current Price
             current_price = price_data['price']
@@ -572,8 +576,8 @@ def main():
         st.subheader(f"🔮 Next {prediction_hours} hours BTC Predictions")
         
         # Get predictions
-        predictions = predict_multiple_hours(model, scaler, live_last_24, prediction_hours)
-        
+        #predictions = predict_multiple_hours(model, scaler, live_last_24, prediction_hours)
+        predictions = get_cached_prediction(model, scaler, live_last_24, prediction_hours)
         if predictions:
             current_time = datetime.now()
             
@@ -683,7 +687,7 @@ def main():
     
     # Auto-refresh
     if auto_refresh:
-        time.sleep(10)
+        time.sleep(60)   # 10 ki jagah 60
         st.rerun()
 
 if __name__ == "__main__":
