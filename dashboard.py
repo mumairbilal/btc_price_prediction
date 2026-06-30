@@ -92,11 +92,11 @@ def load_model_and_scaler():
         model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
         
         model = joblib.load(model_path)
-        with open('scaler.pkl', 'rb') as f:
-            scaler = pickle.load(f)
-        # baqi scaler/config loading bhi isi tarah base_dir use karke karein
-        
-        return model, scaler
+        with open(scaler_path, "rb") as f:
+            scaler = pickle.load(f)   # consistent naam
+        with open('fine tuned model\config.pkl', 'rb') as f:
+            config = pickle.load(f)
+        return model, scaler, config
     except Exception as e:
         st.error(f"Model files not found! Error: {e}")
         return None, None
