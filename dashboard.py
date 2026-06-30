@@ -92,6 +92,8 @@ def load_model_and_scaler():
         model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
         
         model = joblib.load(model_path)
+        with open('scaler.pkl', 'rb') as f:
+            scaler = pickle.load(f)
         # baqi scaler/config loading bhi isi tarah base_dir use karke karein
         
         return model, scaler
