@@ -395,8 +395,7 @@ def main():
         if st.button("Manual Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-        
-        st.markdown("---")
+    
         #st.info("**Model Info**\n\n"
               #  "- Model: Random Forest Regressor\n"
              #   "- Model Accuracy: 99.53%\n"
@@ -405,8 +404,7 @@ def main():
               #  "- Output: Next 1 hour (Prediction)\n"
               #  "- Data: Binance API\n")
                 #"- Validation: Max 5% change/hr")
-        
-        st.markdown("---")
+    
     
     # Get current price
     price_data = get_binance_price()
