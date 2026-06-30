@@ -109,27 +109,18 @@ def load_model_and_scaler():
 @st.cache_data(ttl=10)  # Update every 10 seconds
 def get_binance_price():
     try:
-        
-        response = requests.get(url, params=params)
-        response.raise_for_status()  # yeh add karein
         url = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"
         response = requests.get(url, timeout=5)
+        response.raise_for_status()
         data = response.json()
         
-        current_price = float(data['lastPrice'])
-        price_change = float(data['priceChange'])
-        price_change_percent = float(data['priceChangePercent'])
-        high_24h = float(data['highPrice'])
-        low_24h = float(data['lowPrice'])
-        volume_24h = float(data['volume'])
-        
         return {
-            'price': current_price,
-            'change': price_change,
-            'change_percent': price_change_percent,
-            'high_24h': high_24h,
-            'low_24h': low_24h,
-            'volume_24h': volume_24h,
+            'price': float(data['lastPrice']),
+            'change': float(data['priceChange']),
+            'change_percent': float(data['priceChangePercent']),
+            'high_24h': float(data['highPrice']),
+            'low_24h': float(data['lowPrice']),
+            'volume_24h': float(data['volume']),
             'time': datetime.now()
         }
     except Exception as e:
