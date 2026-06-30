@@ -72,40 +72,6 @@ btc_price_prediction/
 ```
 
 ---
-
-## Installation and Local Setup
-
-**1. Clone the repository**
-
-```bash
-git clone https://github.com/mumairbilal/btc_price_prediction.git
-cd btc_price_prediction
-```
-
-**2. Create a virtual environment**
-
-```bash
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS / Linux
-```
-
-**3. Install dependencies**
-
-```bash
-pip install -r requirements.txt
-```
-
-**4. Run the dashboard**
-
-```bash
-streamlit run dashboard.py
-```
-
-The app will open at `http://localhost:8501`.
-
----
-
 ## Requirements
 
 ```
