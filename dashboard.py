@@ -1,6 +1,6 @@
 """
 Bitcoin Price Prediction Dashboard
-Hourly predictions with Binance API and Beautiful UI
+Hourly predictions with Binance API and Streamlit UI
 """
 
 import streamlit as st
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import requests
 import time
 import joblib
+import pickle
 import os
 
 # Page configuration
@@ -42,10 +43,10 @@ st.markdown("""
     }
     
     /* Headers */
-    h1 {
-        color: #00d4ff !important;
-        font-weight: 700 !important;
-        text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+   h1 {
+    color: #f7931a !important; /* Bitcoin orange */
+    font-weight: 700 !important;
+    text-shadow: 0 0 5px rgba(247, 147, 26, 0.5); /* subtle glow */
     }
     
     h2, h3 {
@@ -71,6 +72,7 @@ st.markdown("""
     
     .stButton>button:hover {
         transform: translateY(-2px);
+        color: white;
         box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
     }
     
@@ -85,8 +87,7 @@ st.markdown("""
 
 # Load model and scaler
 @st.cache_resource
-def load_model_and_scaler():
-    try:
+try:
         #base_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
@@ -96,31 +97,51 @@ def load_model_and_scaler():
         with open(scaler_path, "rb") as f:
             scaler = pickle.load(f)
         
-        #config_path = os.path.join(base_dir, 'config.pkl')
-        #with open(config_path, "rb") as f:
-           # config = pickle.load(f)
+        config_path = os.path.join(base_dir, 'config.pkl')
+        with open(config_path, "rb") as f:
+            config = pickle.load(f)
         
-        return model, scaler
+        return model, scaler, config
     except Exception as e:
         st.error(f"Model files not found! Error: {e}")
         return None, None
+    # --- LSTM MODEL LOADING ---
+    # try:
+        
+    #     #rf_model = joblib.load(r"fine tuned model\btc_prediction_model.pkl")
+    #     model = load_model(r'fine tuned model\btc_prediction_model.h5')
+    #     with open('fine tuned model\scaler.pkl', 'rb') as f:
+    #         scaler = pickle.load(f)
+    #     with open('fine tuned model\config.pkl', 'rb') as f:
+    #         config = pickle.load(f)
+    #     return model, scaler, config
+    # except Exception as e:
+    #     st.error(f" Model files not found! Please run 'python train_model.py' first.\n\nError: {e}")
+    #     return None, None, None
 
 # Get real-time price from Binance
 @st.cache_data(ttl=10)  # Update every 10 seconds
-def get_binance_price():
+def get_binance_price(): # for showing the currect live btc price metrics
     try:
-        url = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"
+        # url = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"
+        url = "https://data-api.binance.vision/api/v3/ticker/24hr?symbol=BTCUSDT"
         response = requests.get(url, timeout=5)
-        response.raise_for_status()
         data = response.json()
         
+        current_price = float(data['lastPrice'])
+        price_change = float(data['priceChange'])
+        price_change_percent = float(data['priceChangePercent'])
+        high_24h = float(data['highPrice'])
+        low_24h = float(data['lowPrice'])
+        volume_24h = float(data['volume'])
+        
         return {
-            'price': float(data['lastPrice']),
-            'change': float(data['priceChange']),
-            'change_percent': float(data['priceChangePercent']),
-            'high_24h': float(data['highPrice']),
-            'low_24h': float(data['lowPrice']),
-            'volume_24h': float(data['volume']),
+            'price': current_price,
+            'change': price_change,
+            'change_percent': price_change_percent,
+            'high_24h': high_24h,
+            'low_24h': low_24h,
+            'volume_24h': volume_24h,
             'time': datetime.now()
         }
     except Exception as e:
@@ -129,39 +150,43 @@ def get_binance_price():
 
 # Get historical hourly data from Binance
 @st.cache_data(ttl=60)  # Cache for 1 minute (more frequent updates)
-def get_binance_historical(hours=48):
+def get_binance_historical(hours=48): # getting full btc data from binance for chart
     try:
-        url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
-        params = {"vs_currency": "usd", "days": "2"}
+        #url = "https://api.binance.com/api/v3/klines"
+        # https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT
+        url = "https://data-api.binance.vision/api/v3/klines"
+        params = {
+            'symbol': 'BTCUSDT',
+            'interval': '1h',
+            'limit': hours
+        }
         response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
         data = response.json()
         
-        prices = data['prices']  # [[timestamp_ms, price], ...]
-        df = pd.DataFrame(prices, columns=['timestamp', 'close'])
+        df = pd.DataFrame(data, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_volume', 'trades', 'taker_buy_base',
+            'taker_buy_quote', 'ignore'
+        ])
+        
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            df[col] = pd.to_numeric(df[col])
         
-        # Approximate OHLC since CoinGecko market_chart sirf close price deta hai
-        df['open'] = df['close'].shift(1).fillna(df['close'])
-        df['high'] = df['close']
-        df['low'] = df['close']
-        df['volume'] = data.get('total_volumes', [[0,0]]*len(df))
-        df['volume'] = [v[1] for v in data['total_volumes'][:len(df)]]
-        
-        return df.tail(hours).reset_index(drop=True)
+        return df
     except Exception as e:
         st.error(f"Error fetching historical data: {e}")
         return pd.DataFrame()
 
 # Get live last 24 hours for predictions
 @st.cache_data(ttl=60)  # Update every minute
-def get_live_24_hours(_scaler):
+def get_live_24_hours(_scaler): # only fetching close price from full data
     """
     Get current last 24 hours data and normalize it for prediction
     """
     try:
         # Get last 24 hours data
-        hist = get_binance_historical(24)
+        hist = get_binance_historical(24) # for candlesticks chart getting full data
         if hist.empty:
             return None
         
@@ -176,67 +201,153 @@ def get_live_24_hours(_scaler):
         st.error(f"Error preparing live data: {e}")
         return None
 
-# Predict next hour price
+# Predict next hour price (ONLY FOR Random Forest) 
 def predict_next_hour(model, scaler, last_24_hours):
     try:
-        X_pred = last_24_hours.reshape(1, 24, 1)
-        predicted_scaled = model.predict(X_pred, verbose=0)
-        predicted_price = scaler.inverse_transform(predicted_scaled)
-        pred = predicted_price[0][0]
-        
-        # Validation: prediction should be within reasonable range
-        # Get last known price
+        # Convert last 24 hours from (24,1) → (1,24)
+        X_pred = last_24_hours.reshape(1, -1)
+
+        # Predict (scaled value)
+        pred_scaled = model.predict(X_pred).reshape(-1, 1)
+        predicted_price = scaler.inverse_transform(pred_scaled)
+        raw_pred = predicted_price[0][0]  # Model ki asli prediction
+
+        # Get last actual known price and trend
         last_prices = scaler.inverse_transform(last_24_hours.reshape(-1, 1))
         last_price = last_prices[-1][0]
         
-        # Check if prediction is within +/- 5% (reasonable for 1 hour)
-        change_pct = abs((pred - last_price) / last_price * 100)
-        if change_pct > 5:  # More than 5% change in 1 hour is suspicious
-            # Return more conservative estimate
-            st.warning(f"⚠️ Model prediction was {change_pct:.2f}% change - using conservative estimate")
-            # Use simple moving average trend instead
-            trend = np.mean(np.diff(last_prices[-5:].flatten()))
-            pred = last_price + trend
-        
-        return pred
-    except Exception as e:
-        st.error(f"Prediction error: {e}")
-        return None
+        # Calculate Recent Trend (Last 5 hours average movement)
+        recent_trend_val = np.mean(np.diff(last_prices[-5:].flatten()))
 
-# Predict multiple hours
+        # --- VALIDATION LOGIC ---
+        
+        # Calculate percentage change
+        change_pct = abs((raw_pred - last_price) / last_price * 100)
+        # 1 ghantay mein 2% ($1800+) change hona bohat rare hai.
+        LIMIT = 2.0 
+
+        if change_pct > LIMIT:
+            # FIX 2: Better Fallback Logic
+            # if model predict too much change, use trend instead
+            # but limit it to 0.5 weights
+            
+            conservative_pred = last_price + (recent_trend_val * 0.5)
+            
+            if abs((conservative_pred - last_price)/last_price*100) > LIMIT:
+                 pred = last_price  # No change (Safest bet)
+            else:
+                 pred = conservative_pred
+                 
+        else:
+            pred = raw_pred
+
+        return pred
+
+    except Exception as e:
+        st.error(f"Prediction Error: {e}")
+        return None
+   
 def predict_multiple_hours(model, scaler, last_24_hours, hours=12):
-    predictions = []
-    current_sequence = last_24_hours.copy()
-    
-    # Get last actual price for validation
-    last_prices = scaler.inverse_transform(last_24_hours.reshape(-1, 1))
-    prev_price = last_prices[-1][0]
-    
-    for i in range(hours):
-        X_pred = current_sequence.reshape(1, 24, 1)
-        next_pred_scaled = model.predict(X_pred, verbose=0)
-        next_pred = scaler.inverse_transform(next_pred_scaled)[0][0]
+    try:
+        predictions = []
+        current_sequence = last_24_hours.copy()
+
+        # Convert last known price
+        last_prices = scaler.inverse_transform(current_sequence.reshape(-1, 1))
+        prev_price = last_prices[-1][0]
+
+        for i in range(hours):
+            # Shape (1,24)
+            X_pred = current_sequence.reshape(1, -1)
+
+            # Predict scaled
+            next_pred_scaled = model.predict(X_pred).reshape(-1, 1)
+            next_pred = scaler.inverse_transform(next_pred_scaled)[0][0]
+
+            # Validation: ML models sometimes jump — limit to 3%
+            change_pct = abs((next_pred - prev_price) / prev_price * 100)
+
+            if change_pct > 3:
+                recent_trend = np.mean(np.diff(last_prices[-5:].flatten()))
+                next_pred = prev_price + recent_trend * 0.8
+
+            # Store prediction
+            predictions.append(next_pred)
+
+            # Update window: normalize new prediction & append it
+            next_pred_norm = scaler.transform([[next_pred]])[0][0]
+            current_sequence = np.append(current_sequence[1:], next_pred_norm)
+
+            # Update previous price
+            prev_price = next_pred
+
+        return predictions
+
+    except Exception as e:
+        st.error(f"RF Multi-Hour Prediction Error: {e}")
+        return []
+
+# Predict next hour price (ONLY FOR LSTM)
+# def predict_next_hour(model, scaler, last_24_hours):
+#     try:
+#         X_pred = last_24_hours.reshape(1, 24, 1)
+#         predicted_scaled = model.predict(X_pred, verbose=0)
+#         predicted_price = scaler.inverse_transform(predicted_scaled)
+#         pred = predicted_price[0][0]
         
-        # Validation: each hour should not change more than 3% typically
-        change_pct = abs((next_pred - prev_price) / prev_price * 100)
-        if change_pct > 3:
-            # Use more conservative prediction based on recent trend
-            recent_trend = np.mean(np.diff(last_prices[-5:].flatten()))
-            next_pred = prev_price + recent_trend * 0.8  # 80% of trend
+#         # Validation: prediction should be within reasonable range
+#         # Get last known price
+#         last_prices = scaler.inverse_transform(last_24_hours.reshape(-1, 1))
+#         last_price = last_prices[-1][0]
         
-        predictions.append(next_pred)
+#         # Check if prediction is within +/- 5% (reasonable for 1 hour)
+#         change_pct = abs((pred - last_price) / last_price * 100)
+#         if change_pct > 5:  # More than 5% change in 1 hour is suspicious
+#             # Return more conservative estimate
+#             st.warning(f"Model prediction was {change_pct:.2f}% change - using conservative estimate")
+#             # Use simple moving average trend instead
+#             trend = np.mean(np.diff(last_prices[-5:].flatten()))
+#             pred = last_price + trend
         
-        # Update sequence with normalized prediction
-        next_pred_normalized = scaler.transform([[next_pred]])[0][0]
-        current_sequence = np.append(current_sequence[1:], next_pred_normalized)
-        prev_price = next_pred
+#         return pred
+#     except Exception as e:
+#         st.error(f"Prediction error: {e}")
+#         return None
+
+# # Predict multiple hours
+# def predict_multiple_hours(model, scaler, last_24_hours, hours=12):
+#     predictions = []
+#     current_sequence = last_24_hours.copy()
     
-    return predictions
+#     # Get last actual price for validation
+#     last_prices = scaler.inverse_transform(last_24_hours.reshape(-1, 1))
+#     prev_price = last_prices[-1][0]
+    
+#     for i in range(hours):
+#         X_pred = current_sequence.reshape(1, 24, 1)
+#         next_pred_scaled = model.predict(X_pred, verbose=0)
+#         next_pred = scaler.inverse_transform(next_pred_scaled)[0][0]
+        
+#         # Validation: each hour should not change more than 3% typically
+#         change_pct = abs((next_pred - prev_price) / prev_price * 100)
+#         if change_pct > 3:
+#             # Use more conservative prediction based on recent trend
+#             recent_trend = np.mean(np.diff(last_prices[-5:].flatten()))
+#             next_pred = prev_price + recent_trend * 0.8  # 80% of trend
+        
+#         predictions.append(next_pred)
+        
+#         # Update sequence with normalized prediction
+#         next_pred_normalized = scaler.transform([[next_pred]])[0][0]
+#         current_sequence = np.append(current_sequence[1:], next_pred_normalized)
+#         prev_price = next_pred
+    
+#     return predictions
 
 # Main dashboard
 def main():
     # Load model
-    model, scaler = load_model_and_scaler()
+    model, scaler, config = load_model_and_scaler()
     
     if model is None:
         st.stop()
@@ -248,13 +359,15 @@ def main():
         st.stop()
     
     # Header with live indicator
-    col_title, col_live = st.columns([4, 1])
-    with col_title:
-        st.title("₿ Bitcoin Price Predictor")
-        st.markdown("**Hourly Predictions with AI**")
-    with col_live:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("🟢 **LIVE**", unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        st.image("https://cryptologos.cc/logos/bitcoin-btc-logo.png", width=130)
+    with col2:
+        st.title("₿ Bitcoin Price Prediction Dashboard")
+        st.markdown("**💎 Real-Time Bitcoin Hourly Forecasting**")
+    # with col_live:
+    #     st.markdown("<br>", unsafe_allow_html=True)
+    #     st.markdown("🟢 **LIVE**", unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -263,10 +376,10 @@ def main():
         st.image("https://cryptologos.cc/logos/bitcoin-btc-logo.png", width=100)
         st.header("⚙️ Settings")
         
-        chart_hours = st.selectbox("📊 Chart Period", [24, 48, 72, 168], index=1, format_func=lambda x: f"{x} hours ({x//24} days)")
+        chart_hours = st.selectbox("📈 Chart Period", [24, 48, 72, 168], index=1, format_func=lambda x: f"{x} hours ({x//24} days)")
         
         prediction_hours = st.select_slider(
-    "🔮 Predict Next",
+    "🔮 Predict Next Hours",
     options=list(range(1, 25)),
     value=6,
     format_func=lambda x: f"{x} hours"
@@ -281,14 +394,15 @@ def main():
         
         st.markdown("---")
         st.info("**🤖 Model Info**\n\n"
-                "- Type: LSTM Neural Network\n"
-                "- Input: Last 24 hours (live)\n"
-                "- Output: Next 1 hour\n"
-                "- Data: Binance API\n"
-                "- Validation: Max 5% change/hr")
+                "- Model: Random Forest Regressor\n"
+                "- Model Accuracy: 99.53%\n"
+                "- (MAPE): 0.47%\n"
+                "- Input: Last 24 hours (Live)\n"
+                "- Output: Next 1 hour (Prediction)\n"
+                "- Data: Binance API\n")
+                #"- Validation: Max 5% change/hr")
         
         st.markdown("---")
-        st.caption("Made for BIA Lahore 🎓")
     
     # Get current price
     price_data = get_binance_price()
@@ -298,7 +412,7 @@ def main():
         st.stop()
     
     # Top metrics row
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.metric(
@@ -319,25 +433,79 @@ def main():
     
     with col3:
         st.metric(
-            label="📈 24h High",
+            label="📈 24h High Price",
             value=f"${price_data['high_24h']:,.2f}",
             delta=None
         )
     
     with col4:
         st.metric(
-            label="📉 24h Low",
+            label="📉 24h Low Price",
             value=f"${price_data['low_24h']:,.2f}",
             delta=None
         )
-    
+    with col5:
+        # Get predictions for next 12 hours
+        future_predictions = predict_multiple_hours(model, scaler, live_last_24, hours=12)
+        
+        if future_predictions:
+            # Current Price
+            current_price = price_data['price']
+            
+            # Average of future prices (Trends check karne ke liye)
+            avg_future_price = sum(future_predictions) / len(future_predictions)
+            
+            # Change calculation (%)
+            pct_change = ((avg_future_price - current_price) / current_price) * 100
+            
+            # Threshold: 0.5% (Fees aur Slippage ko cover karne ke liye)
+            THRESHOLD = 0.5
+            
+            # --- LOGIC FOR TARGET TIME & PROFIT ---
+            
+            if pct_change > THRESHOLD:
+                status = "Buy (Bullish) 🟢"
+                # Buy k liye: Maximum price dhoondo
+                best_price = max(future_predictions)
+                best_hour_index = future_predictions.index(best_price) + 1
+                
+                # NEW: Calculate Dollar Profit
+                profit = best_price - current_price
+                advice = f"Target: {best_price:,.0f} in {best_hour_index} Hrs (Exp. Profit: +${profit:,.0f})"
+                
+            elif pct_change < -THRESHOLD:
+                status = "Sell (Bearish) 🔴"
+                # Sell k liye: Minimum price dhoondo
+                best_price = min(future_predictions)
+                best_hour_index = future_predictions.index(best_price) + 1
+                
+                # NEW: Calculate Dollar Drop
+                drop = current_price - best_price
+                advice = f"Bottom: {best_price:,.0f} in {best_hour_index} Hrs (Exp. Drop: -${drop:,.0f})"
+                
+            else:
+                status = "Hold 🟡"
+                # Updated advice for Presentation logic
+                advice = "Market is choppy/flat (Risk > Reward)"
+            
+            # --- DISPLAY ---
+            st.metric(
+                label="🚦 12-Hour Outlook",
+                value=status,
+                delta=f"{pct_change:.2f}% exp. move"
+            )
+            # Signal ke neeche chota sa Advice note
+            st.caption(f"💡 **Strategy:** {advice}")
+
+        else:
+             st.metric(label="🚦 Signal", value="Analyzing...")
     st.markdown("---")
     
     # Main content area
     col_chart, col_predictions = st.columns([2.5, 1])
     
     with col_chart:
-        st.subheader("📊 Price Chart (Hourly)")
+        st.subheader(f"📈 BTC-USD Price Chart ({chart_hours} hours)")
         
         # Get historical data
         hist_data = get_binance_historical(chart_hours)
@@ -400,7 +568,7 @@ def main():
             st.warning("Unable to load historical data")
     
     with col_predictions:
-        st.subheader("🔮 AI Predictions")
+        st.subheader(f"🔮 Next {prediction_hours} hours BTC Predictions")
         
         # Get predictions
         predictions = predict_multiple_hours(model, scaler, live_last_24, prediction_hours)
@@ -499,14 +667,18 @@ def main():
     st.markdown("---")
     col_f1, col_f2, col_f3 = st.columns(3)
     
-    with col_f1:
-        st.caption(f"⏰ Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
+    # with col_f1:
+    #     st.caption(f"⏰ Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
     
     with col_f2:
-        st.caption(f"📊 24h Volume: {price_data['volume_24h']:,.2f} BTC")
+        st.caption(f"⏰ Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
+        #st.caption(f"📊 24h Volume: {price_data['volume_24h']:,.2f} BTC") %H:%M:%S')}")
     
-    with col_f3:
-        st.caption("⚠️ For educational purposes only")
+    # with col_f3:
+    #     st.caption(f"📊 24h Volume: {price_data['volume_24h']:,.2f} BTC")
+    
+    
+    st.caption("⚠️ Disclaimer: This application provides predictive analytics for informational and educational purposes only. The forecasts generated are probabilistic estimates and may not accurately reflect future market movements. Cryptocurrency markets are highly volatile and unpredictable, and past performance does not guarantee future results.")
     
     # Auto-refresh
     if auto_refresh:
