@@ -86,8 +86,8 @@ st.markdown("""
 def load_model_and_scaler():
     try:
         
-        #rf_model = joblib.load(r"fine tuned model\btc_prediction_model.pkl")
-        model = load_model(r'btc_prediction_model.h5')
+        rf_model = joblib.load(r"btc_prediction_model.pkl")
+        #model = load_model(r'btc_prediction_model.h5')
         with open('scaler.pkl', 'rb') as f:
             scaler = pickle.load(f)
         # with open('fine tuned model\config.pkl', 'rb') as f:
