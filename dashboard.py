@@ -88,7 +88,8 @@ st.markdown("""
 def load_model_and_scaler():
     try:
         #base_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join("/Random Forest Regressor/rf_btc_prediction_model.pkl")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
         
         model = joblib.load(model_path)
         # baqi scaler/config loading bhi isi tarah base_dir use karke karein
