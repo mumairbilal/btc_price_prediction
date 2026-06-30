@@ -5,3 +5,4 @@ plotly
 requests
 joblib
 scikit-learn==1.4.0
+tensorflow-cpu==2.15.0
