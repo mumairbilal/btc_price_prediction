@@ -128,6 +128,13 @@ def get_binance_price():
     except Exception as e:
         st.error(f"Error fetching price: {e}")
         return None
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # yeh add karein
+        # ... baqi code
+    except Exception as e:
+        st.error(f"Binance fetch error: {e}")  # yeh dikhayega 451 error ya kuch aur
+        return pd.DataFrame()
 
 # Get historical hourly data from Binance
 @st.cache_data(ttl=60)  # Cache for 1 minute (more frequent updates)
