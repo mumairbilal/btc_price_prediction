@@ -131,26 +131,24 @@ def get_binance_price():
 @st.cache_data(ttl=60)  # Cache for 1 minute (more frequent updates)
 def get_binance_historical(hours=48):
     try:
-        url = "https://api.binance.com/api/v3/klines"
-        params = {
-            'symbol': 'BTCUSDT',
-            'interval': '1h',
-            'limit': hours
-        }
+        url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+        params = {"vs_currency": "usd", "days": "2"}
         response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
         data = response.json()
         
-        df = pd.DataFrame(data, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_volume', 'trades', 'taker_buy_base',
-            'taker_buy_quote', 'ignore'
-        ])
-        
+        prices = data['prices']  # [[timestamp_ms, price], ...]
+        df = pd.DataFrame(prices, columns=['timestamp', 'close'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        for col in ['open', 'high', 'low', 'close', 'volume']:
-            df[col] = pd.to_numeric(df[col])
         
-        return df
+        # Approximate OHLC since CoinGecko market_chart sirf close price deta hai
+        df['open'] = df['close'].shift(1).fillna(df['close'])
+        df['high'] = df['close']
+        df['low'] = df['close']
+        df['volume'] = data.get('total_volumes', [[0,0]]*len(df))
+        df['volume'] = [v[1] for v in data['total_volumes'][:len(df)]]
+        
+        return df.tail(hours).reset_index(drop=True)
     except Exception as e:
         st.error(f"Error fetching historical data: {e}")
         return pd.DataFrame()
