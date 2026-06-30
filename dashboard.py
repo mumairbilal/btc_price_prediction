@@ -96,11 +96,11 @@ def load_model_and_scaler():
         with open(scaler_path, "rb") as f:
             scaler = pickle.load(f)
         
-        config_path = os.path.join(base_dir, 'config.pkl')
-        with open(config_path, "rb") as f:
-            config = pickle.load(f)
+        #config_path = os.path.join(base_dir, 'config.pkl')
+        #with open(config_path, "rb") as f:
+           # config = pickle.load(f)
         
-        return model, scaler, config
+        return model, scaler
     except Exception as e:
         st.error(f"Model files not found! Error: {e}")
         return None, None
