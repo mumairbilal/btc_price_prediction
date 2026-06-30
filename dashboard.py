@@ -87,7 +87,8 @@ st.markdown("""
 
 # Load model and scaler
 @st.cache_resource
-try:
+def load_model_and_scaler():
+    try:
         #base_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "Random Forest Regressor", "rf_btc_prediction_model.pkl")
