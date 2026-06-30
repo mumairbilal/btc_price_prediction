@@ -383,27 +383,27 @@ def main():
         chart_hours = st.selectbox("📈 Chart Period", [24, 48, 72, 168], index=1, format_func=lambda x: f"{x} hours ({x//24} days)")
         
         prediction_hours = st.select_slider(
-    "🔮 Predict Next Hours",
+    "Predict Next Hours",
     options=list(range(1, 25)),
     value=6,
     format_func=lambda x: f"{x} hours"
 )
         st.markdown("---")
         
-        auto_refresh = st.checkbox("🔄 Auto Refresh (60s)", value=True)
+        auto_refresh = st.checkbox("Auto Refresh (60s)", value=True)
         
-        if st.button("🔃 Manual Refresh", use_container_width=True):
+        if st.button("Manual Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
         
         st.markdown("---")
-        st.info("**🤖 Model Info**\n\n"
-                "- Model: Random Forest Regressor\n"
-                "- Model Accuracy: 99.53%\n"
-                "- (MAPE): 0.47%\n"
-                "- Input: Last 24 hours (Live)\n"
-                "- Output: Next 1 hour (Prediction)\n"
-                "- Data: Binance API\n")
+        #st.info("**Model Info**\n\n"
+              #  "- Model: Random Forest Regressor\n"
+             #   "- Model Accuracy: 99.53%\n"
+             #   "- (MAPE): 0.47%\n"
+              #  "- Input: Last 24 hours (Live)\n"
+              #  "- Output: Next 1 hour (Prediction)\n"
+              #  "- Data: Binance API\n")
                 #"- Validation: Max 5% change/hr")
         
         st.markdown("---")
@@ -420,7 +420,7 @@ def main():
     
     with col1:
         st.metric(
-            label="💰 Current BTC Price",
+            label="Current BTC Price",
             value=f"${price_data['price']:,.2f}",
             delta=f"{price_data['change_percent']:.2f}%"
         )
@@ -431,7 +431,7 @@ def main():
             #pred_change = ((next_hour_pred - price_data['price']) / price_data['price'] * 100)
             pred_change = ((next_hour_pred - price_data['price']) / price_data['price'] * 100)
             st.metric(
-                label="🔮 Next Hour Prediction",
+                label="Next Hour Prediction",
                 value=f"${next_hour_pred:,.2f}",
                 delta=f"{pred_change:+.2f}%"
             )
@@ -573,7 +573,7 @@ def main():
             st.warning("Unable to load historical data")
     
     with col_predictions:
-        st.subheader(f"🔮 Next {prediction_hours} hours BTC Predictions")
+        st.subheader(f"Next {prediction_hours} hours BTC Predictions")
         
         # Get predictions
         #predictions = predict_multiple_hours(model, scaler, live_last_24, prediction_hours)
@@ -676,7 +676,7 @@ def main():
     #     st.caption(f"⏰ Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
     
     with col_f2:
-        st.caption(f"⏰ Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
+        st.caption(f"Last updated: {price_data['time'].strftime('%Y-%m-%d %H:%M:%S')}")
         #st.caption(f"📊 24h Volume: {price_data['volume_24h']:,.2f} BTC") %H:%M:%S')}")
     
     # with col_f3:
